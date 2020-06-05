@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='utf-8' />
+  <title>Get started with the Isochrone API</title>
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+  <!-- Import Mapbox GL JS  -->
+  <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.10.0/mapbox-gl.js'></script>
+  <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.10.0/mapbox-gl.css' rel='stylesheet' />
+  <!-- Import API Keys and whatnot -->
+  <script type='text/javascript' src='config.js'></script>
+  <!-- Import Assembly -->
+  <link href='https://api.mapbox.com/mapbox-assembly/v0.23.2/assembly.min.css' rel='stylesheet'>
+  <script src='https://api.mapbox.com/mapbox-assembly/v0.23.2/assembly.js'> </script>
+  <!-- Import jQuery -->
+  <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js'></script>
+  
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    .marker {
+      background-image: url('mapbox-icon.png');
+      background-size: cover;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      cursor: pointer;
+}
+  </style>
+</head>
+
+<body>
+  <!-- Create a container for the map -->
+  <div id='map'></div>
+
+  <!-- Create a sidebar with buttons for each option -->
+  <div class='absolute fl my24 mx24 py24 px24 bg-gray-faint round'>
+    <form id='params'>
+      <h4 class='txt-m txt-bold mb6'>Chose a travel mode:</h4>
+      <div class='mb12 mr12 toggle-group align-center'>
+        <label class='toggle-container'>
+          <input name='profile' type='radio' value='walking'>
+          <div class='toggle toggle--active-null toggle--null'>Walking</div>
+        </label>
+        <label class='toggle-container'>
+          <input name='profile' type='radio' value='cycling' checked>
+          <div class='toggle toggle--active-null toggle--null'>Cycling</div>
+        </label>
+        <label class='toggle-container'>
+          <input name='profile' type='radio' value='driving'>
+          <div class='toggle toggle--active-null toggle--null'>Driving</div>
+        </label>
+      </div>
+      <h4 class='txt-m txt-bold mb6'>Chose a maximum duration:</h4>
+      <div class='mb12 mr12 toggle-group align-center'>
+        <label class='toggle-container'>
+          <input name='duration' type='radio' value='10' checked>
+          <div class='toggle toggle--active-null toggle--null'>10 min</div>
+        </label>
+        <label class='toggle-container'>
+          <input name='duration' type='radio' value='20'>
+          <div class='toggle toggle--active-null toggle--null'>20 min</div>
+        </label>
+        <label class='toggle-container'>
+          <input name='duration' type='radio' value='30'>
+          <div class='toggle toggle--active-null toggle--null'>30 min</div>
+        </label>
+    </form>
+  </div>
+
+  <script>
+    // Add your Mapbox access token
+    // mapboxgl.accessToken = 'pk.eyJ1Ijoicm9yeW5lYWxvbiIsImEiOiJQSkZ2NU9nIn0.8i2jsHIQQBU4lDdv3emAbQ';
+    mapboxgl.accessToken = myAccessToken
+    var map = new mapboxgl.Map({
+      container: 'map', // Specify the container ID
+      style: 'mapbox://styles/mapbox/streets-v11', // Specify which map style to use
+      center: [35.5296, -18.66579], // Specify the starting position
+      zoom: 4.5, // Specify the starting zoom
+    });
+
+    map.on('load', function() {
+      map.addSource('healthsites', {
+        type: 'geojson',
+        data:
+          'https://gist.githubusercontent.com/Notoncebut2x/89b38b33d8c29d999adba76fe5230ce4/raw/241f53a2ecd84eb3b09b0262a0bbb6f1bda271d9/mozambique.json',
+        cluster: true,
+        clusterMaxZoom: 14, // Max zoom to cluster points on
+        clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
+      });
+
+    map.addLayer({
+      id: 'clusters',
+      type: 'circle',
+      source: 'healthsites',
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': [
+        'step',
+          ['get', 'point_count'],
+          '#007168',
+          100,
+          '#FCE100',
+          500,
+          '#000000'
+          ],
+          'circle-radius': [
+          'step',
+          ['get', 'point_count'],
+          20,
+          100,
+          30,
+          500,
+          40
+          ]
+      }
+    });
+    // });
+
+    map.addLayer({
+      id: 'cluster-count',
+      type: 'symbol',
+      source: 'healthsites',
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': '{point_count_abbreviated}',
+        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        'text-size': 12
+      },
+      paint: {
+        'text-color': '#fff'
+      }
+    });
+
+    map.addLayer({
+      id: 'unclustered-point',
+      type: 'circle',
+      // type: mapboxgl.Marker,
+      source: 'healthsites',
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-color': '#D21034',
+        'circle-radius': 5,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#fff'
+      }
+    });
+  });
+
+
+
+    // inspect a cluster on click
+  map.on('click', 'clusters', function(e) {
+    var features = map.queryRenderedFeatures(e.point, {
+        layers: ['clusters']
+        });
+    var clusterId = features[0].properties.cluster_id;
+      map.getSource('healthsites').getClusterExpansionZoom(
+        clusterId,
+        function(err, zoom) {
+          if (err) return;
+
+            map.easeTo({
+                center: features[0].geometry.coordinates,
+                zoom: zoom
+            });
+        }
+      );
+    });
+
+  // When a click event occurs on a feature in
+  // the unclustered-point layer, open a popup at
+  // the location of the feature, with
+  // description HTML from its properties.
+  
+  map.on('click', 'unclustered-point', function(e) {
+    var coordinates = e.features[0].geometry.coordinates.slice();
+    var type = e.features[0].properties['Facility type'];
+    var name = e.features[0].properties['Facility name'];
+    var admin1 = e.features[0].properties['Admin1'];
+    
+  while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+      coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+  }
+ 
+  new mapboxgl.Popup()
+    .setLngLat(coordinates)
+    .setHTML(
+      '<b>Facility Name:</b> ' + name + '<br><b>Facility Type:</b> ' + type + '<br><b>Provincia:</b> ' + admin1
+    )
+    .addTo(map);
+  });
+
+  // map.on('click', 'unclustered-point', function(e) {
+  //   // Create variables to use in getIso()
+  //   var urlBase = 'https://api.mapbox.com/isochrone/v1/mapbox/';
+  //   var lon = e.features[0].properties.Long;
+  //   var lat = e.features[0].properties.Lat;
+  //   var profile = 'driving';
+  //   var minutes = 10;
+
+  //   function getIso() {
+  //     var query = urlBase + profile + '/' + lon + ',' + lat + '?contours_minutes=' + minutes + '&polygons=true&access_token=' + mapboxgl.accessToken;
+  //     console.log(query)
+  //   }
+  //   //getIso();
+  // });
+
+  map.on('load', function() {
+    // When the map loads, add the source and layer
+      map.addSource('iso', {
+        type: 'geojson',
+        data: {
+          'type': 'FeatureCollection',
+          'features': []
+        }
+      });
+
+    map.addLayer({
+      'id': 'isoLayer',
+      'type': 'fill',
+      // Use "iso" as the data source for this layer
+      'source': 'iso',
+      'layout': {},
+      'paint': {
+       // The fill color for the layer is set to a light purple
+      'fill-color': '#5a3fc0',
+      'fill-opacity': 0.3
+      }
+    }, "poi-label");
+
+      // Initialize the marker at the query coordinates
+      // marker.setLngLat(lngLat).addTo(map);
+
+      // Make the API call
+      getIso();
+    });
+
+
+    // //iso stuff
+
+    // // Create variables to use in getIso()
+    // var urlBase = 'https://api.mapbox.com/isochrone/v1/mapbox/';
+    // var lon = -77.034;
+    // var lat = 38.899;
+    // var profile = 'cycling';
+    // var minutes = 10;
+
+    // // Create a function that sets up the Isochrone API query then makes an Ajax call
+    // function getIso() {
+    //   var query = urlBase + profile + '/' + lon + ',' + lat + '?contours_minutes=' + minutes + '&polygons=true&access_token=' + mapboxgl.accessToken;
+
+    //   $.ajax({
+    //     method: 'GET',
+    //     url: query
+    //   }).done(function(data) {
+    //     // Set the 'iso' source's data to what's returned by the API query
+    //     map.getSource('iso').setData(data);
+    //   })
+    // };
+
+    // var marker = new mapboxgl.Marker({
+    //   'color': '#314ccd'
+    // });
+
+    // // Create a LngLat object to use in the marker initialization
+    // // https://docs.mapbox.com/mapbox-gl-js/api/#lnglat
+    // var lngLat = {
+    //   lon: Long,
+    //   lat: Lat
+    // };
+
+    // map.on('load', function() {
+    //     var url = '/data/Mozambique.json';
+    //     map.addSource('source_id', { type: 'geojson', data: url});
+    //     });
+
+    // map.on('load', function() {
+    //   // When the map loads, add the source and layer
+    //   map.addSource('iso', {
+    //     type: 'geojson',
+    //     data: {
+    //       "type": 'FeatureCollection',
+    //       "features": []
+    //     }
+    //   });
+
+    //   map.addLayer({
+    //     'id': 'isoLayer',
+    //     'type': 'fill',
+    //     // Use "iso" as the data source for this layer
+    //     'source': 'iso',
+    //     'layout': {},
+    //     'paint': {
+    //       // The fill color for the layer is set to a light purple
+    //       'fill-color': '#5a3fc0',
+    //       'fill-opacity': 0.3
+    //     }
+    //   }, "poi-label");
+
+    //   // Initialize the marker at the query coordinates
+    //   marker.setLngLat(lngLat).addTo(map);
+
+    //   // Make the API call
+    //   getIso();
+    // });
+
+    // // Target the "params" form in the HTML portion of your code
+    // var params = document.getElementById('params');
+
+    // // When a user changes the value of profile or duration by clicking a button, change the parameter's value and make the API query again
+    // params.addEventListener('change', function(e) {
+    //   if (e.target.name === 'profile') {
+    //     profile = e.target.value;
+    //     getIso();
+    //   } else if (e.target.name === 'duration') {
+    //     minutes = e.target.value;
+    //     getIso();
+    //   }
+    // });
+  </script>
+</body>
+
+</html>
