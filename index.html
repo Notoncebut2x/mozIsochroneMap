@@ -91,43 +91,89 @@
       zoom: 4.5, // Specify the starting zoom
     });
 
+    /**
+    * Constructs query parameters for Mapbox Isochrone API
+    * Sets data in the 'iso' layer to be the geojson returned from the Isochrone API
+    * 
+    * @param lat - latitude of point
+    * @param lon - longitude of point
+    * @param profile - whether we are calculating driving time or cycling time
+    * @param minutes - how many minutes of driving time? 
+    **/
+    function getIso(lat, lon, profile, minutes) {
+      var urlBase = 'https://api.mapbox.com/isochrone/v1/mapbox/';
+      var profile = profile || 'driving';
+      var minutes = minutes || 10;
+      
+      var query = urlBase + profile + '/' + lon + ',' + lat + '?contours_minutes=' + minutes + '&polygons=true&access_token=' + myAccessToken;
+
+      $.ajax({
+        method: 'GET',
+        url: query
+      }).done(function(isochroneData) {
+        // Set the 'iso' source's data to what's returned by the API query
+        map.getSource('iso').setData(isochroneData);
+      })
+    };
+
     map.on('load', function() {
       map.addSource('healthsites', {
         type: 'geojson',
         data:
-          'https://gist.githubusercontent.com/Notoncebut2x/89b38b33d8c29d999adba76fe5230ce4/raw/241f53a2ecd84eb3b09b0262a0bbb6f1bda271d9/mozambique.json',
+        'https://gist.githubusercontent.com/Notoncebut2x/89b38b33d8c29d999adba76fe5230ce4/raw/241f53a2ecd84eb3b09b0262a0bbb6f1bda271d9/mozambique.json',
         cluster: true,
         clusterMaxZoom: 14, // Max zoom to cluster points on
         clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
       });
 
-    map.addLayer({
-      id: 'clusters',
-      type: 'circle',
-      source: 'healthsites',
-      filter: ['has', 'point_count'],
-      paint: {
-        'circle-color': [
-        'step',
-          ['get', 'point_count'],
-          '#007168',
-          100,
-          '#FCE100',
-          500,
-          '#000000'
+      map.addLayer({
+        id: 'clusters',
+        type: 'circle',
+        source: 'healthsites',
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': [
+            'step',
+            ['get', 'point_count'],
+            '#007168',
+            100,
+            '#FCE100',
+            500,
+            '#000000'
           ],
           'circle-radius': [
-          'step',
-          ['get', 'point_count'],
-          20,
-          100,
-          30,
-          500,
-          40
+            'step',
+            ['get', 'point_count'],
+            20,
+            100,
+            30,
+            500,
+            40
           ]
+        }
+      });
+
+      map.addSource('iso', {
+        type: 'geojson',
+        data: {
+          'type': 'FeatureCollection',
+          'features': []
+        }
+      });
+
+    map.addLayer({
+      'id': 'isoLayer',
+      'type': 'fill',
+      // Use "iso" as the data source for this layer
+      'source': 'iso',
+      'layout': {},
+      'paint': {
+       // The fill color for the layer is set to a light purple
+      'fill-color': '#5a3fc0',
+      'fill-opacity': 0.3
       }
-    });
-    // });
+    }, "poi-label");
+
 
     map.addLayer({
       id: 'cluster-count',
@@ -160,8 +206,7 @@
   });
 
 
-
-    // inspect a cluster on click
+  // inspect a cluster on click
   map.on('click', 'clusters', function(e) {
     var features = map.queryRenderedFeatures(e.point, {
         layers: ['clusters']
@@ -201,135 +246,9 @@
       '<b>Facility Name:</b> ' + name + '<br><b>Facility Type:</b> ' + type + '<br><b>Provincia:</b> ' + admin1
     )
     .addTo(map);
+  
+    getIso(coordinates[1], coordinates[0])
   });
-
-  // map.on('click', 'unclustered-point', function(e) {
-  //   // Create variables to use in getIso()
-  //   var urlBase = 'https://api.mapbox.com/isochrone/v1/mapbox/';
-  //   var lon = e.features[0].properties.Long;
-  //   var lat = e.features[0].properties.Lat;
-  //   var profile = 'driving';
-  //   var minutes = 10;
-
-  //   function getIso() {
-  //     var query = urlBase + profile + '/' + lon + ',' + lat + '?contours_minutes=' + minutes + '&polygons=true&access_token=' + mapboxgl.accessToken;
-  //     console.log(query)
-  //   }
-  //   //getIso();
-  // });
-
-  map.on('load', function() {
-    // When the map loads, add the source and layer
-      map.addSource('iso', {
-        type: 'geojson',
-        data: {
-          'type': 'FeatureCollection',
-          'features': []
-        }
-      });
-
-    map.addLayer({
-      'id': 'isoLayer',
-      'type': 'fill',
-      // Use "iso" as the data source for this layer
-      'source': 'iso',
-      'layout': {},
-      'paint': {
-       // The fill color for the layer is set to a light purple
-      'fill-color': '#5a3fc0',
-      'fill-opacity': 0.3
-      }
-    }, "poi-label");
-
-      // Initialize the marker at the query coordinates
-      // marker.setLngLat(lngLat).addTo(map);
-
-      // Make the API call
-      getIso();
-    });
-
-
-    // //iso stuff
-
-    // // Create variables to use in getIso()
-    // var urlBase = 'https://api.mapbox.com/isochrone/v1/mapbox/';
-    // var lon = -77.034;
-    // var lat = 38.899;
-    // var profile = 'cycling';
-    // var minutes = 10;
-
-    // // Create a function that sets up the Isochrone API query then makes an Ajax call
-    // function getIso() {
-    //   var query = urlBase + profile + '/' + lon + ',' + lat + '?contours_minutes=' + minutes + '&polygons=true&access_token=' + mapboxgl.accessToken;
-
-    //   $.ajax({
-    //     method: 'GET',
-    //     url: query
-    //   }).done(function(data) {
-    //     // Set the 'iso' source's data to what's returned by the API query
-    //     map.getSource('iso').setData(data);
-    //   })
-    // };
-
-    // var marker = new mapboxgl.Marker({
-    //   'color': '#314ccd'
-    // });
-
-    // // Create a LngLat object to use in the marker initialization
-    // // https://docs.mapbox.com/mapbox-gl-js/api/#lnglat
-    // var lngLat = {
-    //   lon: Long,
-    //   lat: Lat
-    // };
-
-    // map.on('load', function() {
-    //     var url = '/data/Mozambique.json';
-    //     map.addSource('source_id', { type: 'geojson', data: url});
-    //     });
-
-    // map.on('load', function() {
-    //   // When the map loads, add the source and layer
-    //   map.addSource('iso', {
-    //     type: 'geojson',
-    //     data: {
-    //       "type": 'FeatureCollection',
-    //       "features": []
-    //     }
-    //   });
-
-    //   map.addLayer({
-    //     'id': 'isoLayer',
-    //     'type': 'fill',
-    //     // Use "iso" as the data source for this layer
-    //     'source': 'iso',
-    //     'layout': {},
-    //     'paint': {
-    //       // The fill color for the layer is set to a light purple
-    //       'fill-color': '#5a3fc0',
-    //       'fill-opacity': 0.3
-    //     }
-    //   }, "poi-label");
-
-    //   // Initialize the marker at the query coordinates
-    //   marker.setLngLat(lngLat).addTo(map);
-
-    //   // Make the API call
-    //   getIso();
-    // });
-
-    // // Target the "params" form in the HTML portion of your code
-    // var params = document.getElementById('params');
-
-    // // When a user changes the value of profile or duration by clicking a button, change the parameter's value and make the API query again
-    // params.addEventListener('change', function(e) {
-    //   if (e.target.name === 'profile') {
-    //     profile = e.target.value;
-    //     getIso();
-    //   } else if (e.target.name === 'duration') {
-    //     minutes = e.target.value;
-    //     getIso();
-    //   }
-    // });
   </script>
 </body>
 
